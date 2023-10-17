@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "sisyphus-fonts"
+version = "0.9.0"
+description = "A Sisyphus client module to process SubStation Alpha subtitles for embedded fonts."
+authors = ["JamesTheBard <jamesthebard@gmail.com>"]
+readme = "README.md"
+packages = [{include = "sisyphus_fonts"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+kaitaistruct = "^0.10"
+python-box = "^7.1.1"
+loguru = "^0.7.2"
+fuzzywuzzy = "^0.18.0"
+python-levenshtein = "^0.23.0"
+fonttools = "^4.43.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.16.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
