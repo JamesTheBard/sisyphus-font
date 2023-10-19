@@ -1,10 +1,22 @@
-from fontscrape.subparse import SubParse
+from pathlib import Path
+
+from loguru import logger
+
 from fontscrape.fonts import FontLibrary
+from fontscrape.subparse import SubParse
 
-a = SubParse('test4.ssa')
-sub_fonts = a.process_style_section()
-a.process_dialogue_section()
+fl = FontLibrary('fonts')
 
-# f = FontLibrary('fonts2')
-# for i in sub_fonts:
-#     print(f.find_font(i.family, i.subfamily, use_full_name=True, ignore_regular=True))
+fonts = list()
+subs = Path('.').glob("*.ssa")
+for sub in subs:
+    logger.info(f"Processing subtitle file: {sub}")
+    a = SubParse(sub)
+    for style in a.styles:
+        fonts.append(
+            fl.find_font(style.family, style.subfamily,
+                         use_full_name=True, downgrade=True, threshold=90)
+        )
+
+fonts = set([i.font for i in fonts if i])
+[logger.info(f"Found font: {i.font_path}") for i in fonts]

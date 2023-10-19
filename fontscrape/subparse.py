@@ -4,6 +4,7 @@ from enum import Enum
 from dataclasses import dataclass
 from fontscrape.fonts import FontLibrary
 import re
+from loguru import logger
 
 
 class StyleFields(Enum):
@@ -21,10 +22,17 @@ class SubFont:
     
 
 class SubParse:
+    
+    ssa_file: Path
+    content: List[str]
+    _styles: List[SubFont]
+    _dialogue: List[SubFont]
+    
     def __init__(self, ssa_file: Union[Path, str]):
         self.ssa_file = Path(ssa_file)
         self.content = self.get_content()
-        self.styles = self.process_style_section()
+        self._styles = self.process_style_section()
+        self._dialogue = self.process_dialogue_section()
 
     def get_content(self):
         with self.ssa_file.open('r', encoding="utf-8") as f:
@@ -43,19 +51,50 @@ class SubParse:
             if c[StyleFields.SUBFAMILY_ITALIC.value] == "-1":
                 subfamily.append("italic")
             results.append(SubFont(style.strip(), family, subfamily))
-        return results
+            
+        dialogue = [i for i in self.content if i.startswith('Dialogue: ')]
+        new_results = list()
+        for r in results:
+            found_result = False
+            for d in dialogue:
+                style = d.split(',')[3].strip()
+                if style == r.style:
+                    new_results.append(r)
+                    found_result = True
+                    break
+            if not found_result:
+                logger.debug(f"Removing style '{r.style}': not referenced in dialogue.")
+        return new_results
     
     def process_dialogue_section(self) -> List[SubFont]:
         content = [i for i in self.content if i.startswith('Dialogue: ')]
-        for c in content:
+        results = list()
+        for idx, c in enumerate(content):
             dialogue = ''.join(c.split(',')[9:])
-            style = [i for i in self.styles if i.style == c.split(',')[3]][0]
-            family, subfamilies = None, list()
+            style = [i for i in self._styles if i.style == c.split(',')[3]][0]
+            family, subfamilies, not_subfamilies = None, list(), list()
             if (font_name := re.search(r'\\fn(.+?)(?:[}\\])', dialogue)):
-                font = font_name.group(1)
-            if re.search(r'\\b1(?:[}\\])', dialogue):
-                subfamilies.append("bold")
-            if re.search(r'\\i1(?:[}\\])', dialogue):
-                subfamilies.append("italic")
-                
-            # print(style)
+                family = font_name.group(1)
+            if (bold := re.search(r'\\b(\d+)(?:[}\\])', dialogue)):
+                if int(bold.group(1)) == 0:
+                    not_subfamilies.append("bold")
+                else:
+                    subfamilies.append("bold")
+            if (italic := re.search(r'\\i(\d)(?:[}\\])', dialogue)):
+                if int(italic.group(1)) == 0:
+                    not_subfamilies.append("italic")
+                else:
+                    subfamilies.append("italic")
+            if family or subfamilies or not_subfamilies:
+                if not family:
+                    family = style.family
+                    if subfamilies:
+                        subfamilies = list(set(subfamilies).union(style.subfamily))
+                    else:
+                        subfamilies = list(set(subfamilies).difference(not_subfamilies))
+                results.append(SubFont(f"dialogue:{idx:05}", family, subfamilies))
+        return results
+    
+    @property
+    def styles(self):
+        return self._styles + self._dialogue
