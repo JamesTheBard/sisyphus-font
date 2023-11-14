@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from fontTools import ttLib
 from fuzzywuzzy import fuzz
@@ -17,10 +17,10 @@ class Font:
         full_name (str): The full name of the font.
         font_path (Path): The filesystem location of the font.
     """
-    family: Optional[str] = None
-    subfamily: Optional[list] = None
-    full_name: Optional[str] = None
-    font_path: Optional[Path] = None
+    family: str
+    subfamily: list[str]
+    full_name: str
+    font_path: Path
 
     def __eq__(self, other):
         return self.full_path == other.full_path
@@ -84,7 +84,7 @@ class FontLibrary:
         library_path (Union[Path, str]): The path of the directory containing the fonts to parse.
     """
 
-    library: List[Font]
+    library: list[Font]
     library_path: Union[Path, str]
 
     def __init__(self, library_path: Union[Path, str]):
@@ -96,19 +96,19 @@ class FontLibrary:
         self.library_path = Path(library_path)
         self.library = self.parse_library()
 
-    def parse_library(self) -> List[Font]:
+    def parse_library(self) -> list[Font]:
         """Parse all of the fonts in the library."""
         results = list()
         for f in self.library_path.glob("*"):
             if f.suffix.lower() not in [".ttf", ".otf"]:
                 continue
             ttf = ttLib.TTFont(f)['name']
-            font = Font()
-            font.family = ttf.getBestFamilyName()
-            font.subfamily = sorted(
-                [i.lower() for i in ttf.getBestSubFamilyName().split(" ")])
-            font.full_name = ttf.getBestFullName()
-            font.font_path = f
+            font = Font(
+                family=ttf.getBestFamilyName(),
+                subfamily=sorted([i.lower() for i in ttf.getBestSubFamilyName().split(" ")]),
+                full_name=ttf.getBestFullName(),
+                font_path=f
+            )
             results.append(font)
         return results
 
@@ -167,13 +167,13 @@ class FontLibrary:
                 subfamily = ', '.join(subfamily) if subfamily else "None"
                 logger.warning(
                     f"Could not find font: {family}, subfamilies: {orig_subfamily}")
-            else:
-                font = results.font
-                dg_flag = "↓" if results.downgrade else " "
-                subfamily = ', '.join(font.subfamily) if subfamily else "None"
-                logger.debug(
-                    f"Found font: [{dg_flag}{results.family_match_score:>3}%] {font.family}, subfamilies: {subfamily}")
+                return results
 
+            font = results.font
+            dg_flag = "↓" if results.downgrade else " "
+            subfamily = ', '.join(font.subfamily) if subfamily else "None"
+            logger.debug(
+                f"Found font: [{dg_flag}{results.family_match_score:>3}%] {font.family}, subfamilies: {subfamily}")
             return results
 
     def find_font_by_full_name(self, family: str,
@@ -237,7 +237,7 @@ class FontLibrary:
                 f"Found font: [{dg_flag}{results.family_match_score:>3}%] {font.family}, subfamilies: {subfamily}")
         return results
 
-    def find_font_by_family(self, family: str, threshold: int = 90) -> List[FontResult]:
+    def find_font_by_family(self, family: str, threshold: int = 90) -> list[FontResult]:
         """Find a font by only comparing against the font family.
 
         Args:
